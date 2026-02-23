@@ -53,6 +53,7 @@ ENV NODE_ENV=production
 
 # Create /data directory for Railway/container volume mounts.
 # Must be done as root before switching to node user.
+USER root
 RUN mkdir -p /data && chown -R node:node /data
 
 # Security hardening: Run as non-root user
