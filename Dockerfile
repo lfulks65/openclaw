@@ -51,18 +51,24 @@ RUN pnpm ui:build
 
 ENV NODE_ENV=production
 
-# Create /data directory for Railway/container volume mounts.
-# Must be done as root before switching to node user.
+# Install gosu for dropping privileges in entrypoint
 USER root
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends gosu && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create /data directory for Railway/container volume mounts.
 RUN mkdir -p /data && chown -R node:node /data
 
-# Security hardening: Run as non-root user
-# The node:22-bookworm image includes a 'node' user (uid 1000)
-# This reduces the attack surface by preventing container escape via root privileges
-USER node
+# Copy entrypoint script (fixes volume permissions at runtime)
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Start gateway server for container/PaaS deployments (Railway, Render, etc.).
 # Binds to 0.0.0.0 (LAN mode) so container orchestrators can reach the service.
+#
+# The entrypoint runs as root to fix volume permissions, then drops to node user.
 #
 # Required env vars for container deployments:
 #   - PORT (e.g. 8080): The port to listen on
@@ -71,4 +77,5 @@ USER node
 # Recommended env vars:
 #   - OPENCLAW_STATE_DIR=/data/.openclaw
 #   - OPENCLAW_WORKSPACE_DIR=/data/workspace
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["node", "openclaw.mjs", "gateway", "--allow-unconfigured", "--bind", "lan"]
